@@ -7,9 +7,11 @@ from app.agents.memory_agent import memory_agent
 
 
 def should_act(state: SentraState) -> str:
-    llm_result = state.get("llm_result", {})
-    has_actions = bool(llm_result.get("recommended_actions"))
-    return "action" if has_actions else "memory"
+    if state.get("errors"):
+        return "memory"
+    llm_result = state.get("llm_result") or {}
+    actions = llm_result.get("recommended_actions") or []
+    return "action" if actions else "memory"
 
 
 def build_sentra_graph():
@@ -22,7 +24,11 @@ def build_sentra_graph():
 
     workflow.set_entry_point("extract")
     workflow.add_edge("extract", "reason")
-    workflow.add_conditional_edges("reason", should_act, {"action": "action", "memory": "memory"})
+    workflow.add_conditional_edges(
+        "reason",
+        should_act,
+        {"action": "action", "memory": "memory"},
+    )
     workflow.add_edge("action", "memory")
     workflow.add_edge("memory", END)
 

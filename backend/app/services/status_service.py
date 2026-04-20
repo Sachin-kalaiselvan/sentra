@@ -5,41 +5,24 @@ from app.services.approval_service import get_pending
 
 def get_task_status(task_id: str):
     task_result = AsyncResult(task_id, app=celery_app)
+    state = task_result.state
 
-    # Case 1: still processing
-    if task_result.state in ["PENDING", "STARTED"]:
-        return {
-            "task_id": task_id,
-            "status": "processing"
-        }
+    if state == "PENDING":
+        pending_data = get_pending(task_id)
+        if pending_data:
+            return {"task_id": task_id, "status": "waiting_approval", "result": pending_data}
+        return {"task_id": task_id, "status": "queued"}
 
-    # Case 2: finished
-    if task_result.state == "SUCCESS":
-        result = task_result.result
+    if state == "STARTED":
+        return {"task_id": task_id, "status": "processing"}
 
-        # check if waiting approval
+    if state == "SUCCESS":
+        result = task_result.result or {}
         if result.get("requires_approval"):
-            return {
-                "task_id": task_id,
-                "status": "waiting_approval",
-                "result": result
-            }
+            return {"task_id": task_id, "status": "waiting_approval", "result": result}
+        return {"task_id": task_id, "status": "completed", "result": result}
 
-        return {
-            "task_id": task_id,
-            "status": "completed",
-            "result": result
-        }
+    if state == "FAILURE":
+        return {"task_id": task_id, "status": "failed", "error": str(task_result.result)}
 
-    # Case 3: failed
-    if task_result.state == "FAILURE":
-        return {
-            "task_id": task_id,
-            "status": "failed",
-            "error": str(task_result.result)
-        }
-
-    return {
-        "task_id": task_id,
-        "status": task_result.state
-    }
+    return {"task_id": task_id, "status": state.lower()}

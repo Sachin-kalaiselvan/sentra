@@ -8,22 +8,28 @@ services:
       - .:/app
       - uploads:/app/uploads
     env_file: .env
+    stop_grace_period: 5s
     depends_on:
-      - postgres
-      - redis
-      - qdrant
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   worker:
     build: .
-    command: celery -A app.tasks.celery_app worker --loglevel=info
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
     volumes:
       - .:/app
       - uploads:/app/uploads
     env_file: .env
+    stop_grace_period: 5s
     depends_on:
-      - postgres
-      - redis
-      - qdrant
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
 
   flower:
     build: .
@@ -31,8 +37,10 @@ services:
     ports:
       - "5555:5555"
     env_file: .env
+    stop_grace_period: 5s
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:16
@@ -44,11 +52,23 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sentra"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis:
     image: redis:7
     ports:
       - "6379:6379"
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   qdrant:
     image: qdrant/qdrant
@@ -56,6 +76,12 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   prometheus:
     image: prom/prometheus:latest
@@ -63,6 +89,7 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    stop_grace_period: 5s
     depends_on:
       - api
 
