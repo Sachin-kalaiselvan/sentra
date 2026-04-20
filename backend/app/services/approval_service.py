@@ -18,8 +18,9 @@ def approve_task(task_id: str):
     state = get_pending(task_id)
     if not state:
         return {"error": "task not found"}
-    executed = [f"approved: {a}" for a in state.get("anomalies", [])]
-    state["actions"] = executed
+
+    from app.agents.action_agent import action_agent
     state["requires_approval"] = False
+    state = action_agent(state)
     r.delete(task_id)
     return state
