@@ -57,6 +57,15 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
   qdrant_data:

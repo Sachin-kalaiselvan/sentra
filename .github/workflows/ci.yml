@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Check imports compile
+        working-directory: backend
+        run: |
+          python -c "from app.agents.extract_agent import extract_agent"
+          python -c "from app.agents.reason_agent import reason_agent"
+          python -c "from app.agents.action_agent import action_agent"
+          python -c "from app.agents.memory_agent import memory_agent"
+          python -c "from app.graphs.workflow import build_sentra_graph"
+          python -c "from app.services.llm_service import analyze_document"
+          echo "All imports OK"
+
+      - name: Run graph build test
+        working-directory: backend
+        env:
+          GROQ_API_KEY: dummy
+          QDRANT_HOST: localhost
+          REDIS_URL: redis://localhost:6379/0
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+        run: |
+          python -c "
+          from app.graphs.workflow import build_sentra_graph
+          g = build_sentra_graph()
+          print('Graph compiled successfully:', g)
+          "
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        working-directory: backend
+        run: docker build -t sentra-api .
+
+      - name: Verify image runs
+        run: |
+          docker run --rm -e GROQ_API_KEY=dummy sentra-api python -c "print('Container OK')"

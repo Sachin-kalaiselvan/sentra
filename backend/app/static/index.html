@@ -1,58 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Sentra Dashboard</title>
-    <style>
-        body {
-            font-family: Arial;
-            background: #0f172a;
-            color: white;
-            padding: 40px;
-        }
-        .card {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 10px 15px;
-            margin-top: 10px;
-            cursor: pointer;
-        }
-        input {
-            margin-top: 10px;
-        }
-    </style>
-</head>
-
-<body>
-    <h1>Sentra AI Dashboard</h1>
-
-    <div class="card">
-        <h3>Upload File</h3>
-        <input type="file" id="fileInput">
-        <br>
-        <button onclick="upload()">Upload</button>
-        <p id="uploadResult"></p>
-    </div>
-
-    <div class="card">
-        <h3>Check Status</h3>
-        <input type="text" id="taskId" placeholder="Enter Task ID">
-        <br>
-        <button onclick="checkStatus()">Check</button>
-        <pre id="statusResult"></pre>
-    </div>
-
-    <div class="card">
-        <h3>Approve Task</h3>
-        <input type="text" id="approveId" placeholder="Task ID">
-        <br>
-        <button onclick="approve()">Approve</button>
-        <pre id="approveResult"></pre>
-    </div>
-
 <script>
 async function upload() {
     const file = document.getElementById("fileInput").files[0];
@@ -65,8 +10,13 @@ async function upload() {
     });
 
     const data = await res.json();
+
     document.getElementById("uploadResult").innerText =
         "Task ID: " + data.task_id;
+
+    // Auto-fill task ID for convenience
+    document.getElementById("taskId").value = data.task_id;
+    document.getElementById("approveId").value = data.task_id;
 }
 
 async function checkStatus() {
@@ -77,6 +27,9 @@ async function checkStatus() {
 
     document.getElementById("statusResult").innerText =
         JSON.stringify(data, null, 2);
+
+    // 🔥 ADD AGENT TRACE DISPLAY
+    showAgentTrace(data);
 }
 
 async function approve() {
@@ -91,7 +44,47 @@ async function approve() {
     document.getElementById("approveResult").innerText =
         JSON.stringify(data, null, 2);
 }
-</script>
 
-</body>
-</html>
+
+// ✅ SIMPLE AGENT TRACE (compatible with your backend)
+function showAgentTrace(d) {
+    const result = d.result || {};
+    const extracted = result.extracted_data || {};
+    const llm = result.llm_result || {};
+    const actions = result.actions || [];
+
+    let trace = "\n\n--- AGENT TRACE ---\n";
+
+    // Extract Agent
+    if (extracted.char_count > 0) {
+        trace += `✓ Extract: Parsed ${extracted.char_count} chars\n`;
+    } else {
+        trace += `! Extract: Failed to extract text\n`;
+    }
+
+    // Reason Agent
+    if (llm.document_type && llm.document_type !== "unknown") {
+        trace += `✓ Reason: Classified as ${llm.document_type} (risk: ${result.risk_level})\n`;
+    } else {
+        trace += `! Reason: LLM failed (check GROQ_API_KEY)\n`;
+    }
+
+    // Action Agent
+    if (actions.length > 0) {
+        trace += `✓ Action: ${actions.length} actions generated\n`;
+    } else if (result.requires_approval) {
+        trace += `! Action: Waiting for approval\n`;
+    } else {
+        trace += `! Action: No actions triggered\n`;
+    }
+
+    // Memory Agent
+    if ((result.memory_notes || []).length > 0) {
+        trace += `✓ Memory: Stored in vector DB\n`;
+    } else {
+        trace += `! Memory: Not stored\n`;
+    }
+
+    document.getElementById("statusResult").innerText += trace;
+}
+</script>
