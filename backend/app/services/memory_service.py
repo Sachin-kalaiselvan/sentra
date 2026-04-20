@@ -1,4 +1,5 @@
 import os
+import time
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
@@ -30,13 +31,21 @@ def get_embedder():
 
 
 def init_memory():
-    client = get_client()
-    existing = [c.name for c in client.get_collections().collections]
-    if COLLECTION not in existing:
-        client.create_collection(
-            collection_name=COLLECTION,
-            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
-        )
+    for attempt in range(10):
+        try:
+            client = get_client()
+            existing = [c.name for c in client.get_collections().collections]
+            if COLLECTION not in existing:
+                client.create_collection(
+                    collection_name=COLLECTION,
+                    vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+                )
+            print(f"[Memory] Qdrant ready. Collection: {COLLECTION}")
+            return
+        except Exception as e:
+            print(f"[Memory] Qdrant not ready (attempt {attempt + 1}/10): {e}")
+            time.sleep(2)
+    print("[Memory] WARNING: Could not connect to Qdrant after 10 attempts")
 
 
 def save_memory(task_id: str, filename: str, summary: str, anomalies: list):
@@ -61,11 +70,15 @@ def save_memory(task_id: str, filename: str, summary: str, anomalies: list):
 
 
 def search_similar(query: str, limit: int = 3):
-    vector = get_embedder().encode(query).tolist()
-    results = get_client().search(
-        collection_name=COLLECTION,
-        query_vector=vector,
-        limit=limit,
-        with_payload=True,
-    )
-    return [{"score": r.score, **r.payload} for r in results]
+    try:
+        vector = get_embedder().encode(query).tolist()
+        results = get_client().search(
+            collection_name=COLLECTION,
+            query_vector=vector,
+            limit=limit,
+            with_payload=True,
+        )
+        return [{"score": r.score, **r.payload} for r in results]
+    except Exception as e:
+        print(f"[Memory] search_similar failed: {e}")
+        return []
