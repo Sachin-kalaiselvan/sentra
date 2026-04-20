@@ -1,22 +1,36 @@
 import os
-import uuid
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
-from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
 QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 COLLECTION = os.getenv("QDRANT_COLLECTION", "sentra_memory")
-VECTOR_SIZE = 384  # all-MiniLM-L6-v2 output dimension
+VECTOR_SIZE = 384
 
-client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+_client = None
+_embedder = None
+
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    return _client
+
+
+def get_embedder():
+    global _embedder
+    if _embedder is None:
+        from sentence_transformers import SentenceTransformer
+        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedder
 
 
 def init_memory():
+    client = get_client()
     existing = [c.name for c in client.get_collections().collections]
     if COLLECTION not in existing:
         client.create_collection(
@@ -27,9 +41,9 @@ def init_memory():
 
 def save_memory(task_id: str, filename: str, summary: str, anomalies: list):
     text = f"file: {filename}. anomalies: {', '.join(anomalies)}. summary: {summary}"
-    vector = embedder.encode(text).tolist()
+    vector = get_embedder().encode(text).tolist()
     point_id = abs(hash(task_id)) % (10 ** 9)
-    client.upsert(
+    get_client().upsert(
         collection_name=COLLECTION,
         points=[
             PointStruct(
@@ -47,8 +61,8 @@ def save_memory(task_id: str, filename: str, summary: str, anomalies: list):
 
 
 def search_similar(query: str, limit: int = 3):
-    vector = embedder.encode(query).tolist()
-    results = client.search(
+    vector = get_embedder().encode(query).tolist()
+    results = get_client().search(
         collection_name=COLLECTION,
         query_vector=vector,
         limit=limit,

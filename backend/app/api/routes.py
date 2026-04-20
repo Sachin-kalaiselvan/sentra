@@ -4,6 +4,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.tasks.pipeline import process_document
 from app.services.approval_service import approve_task, get_pending
 from app.services.status_service import get_task_status
+from fastapi.responses import HTMLResponse
 
 router = APIRouter()
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
@@ -50,3 +51,13 @@ def pending(task_id: str):
     if not data:
         raise HTTPException(status_code=404, detail="task not found")
     return data
+
+@router.get("/", response_class=HTMLResponse)
+def dashboard():
+    with open("app/static/index.html") as f:
+        return f.read()
+    
+@router.get("/memory/search")
+def memory_search(q: str):
+    from app.services.memory_service import search_similar
+    return search_similar(q)

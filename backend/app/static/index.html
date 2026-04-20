@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sentra Dashboard</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+            padding: 40px;
+        }
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        input {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Sentra AI Dashboard</h1>
+
+    <div class="card">
+        <h3>Upload File</h3>
+        <input type="file" id="fileInput">
+        <br>
+        <button onclick="upload()">Upload</button>
+        <p id="uploadResult"></p>
+    </div>
+
+    <div class="card">
+        <h3>Check Status</h3>
+        <input type="text" id="taskId" placeholder="Enter Task ID">
+        <br>
+        <button onclick="checkStatus()">Check</button>
+        <pre id="statusResult"></pre>
+    </div>
+
+    <div class="card">
+        <h3>Approve Task</h3>
+        <input type="text" id="approveId" placeholder="Task ID">
+        <br>
+        <button onclick="approve()">Approve</button>
+        <pre id="approveResult"></pre>
+    </div>
+
+<script>
+async function upload() {
+    const file = document.getElementById("fileInput").files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/upload", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await res.json();
+    document.getElementById("uploadResult").innerText =
+        "Task ID: " + data.task_id;
+}
+
+async function checkStatus() {
+    const id = document.getElementById("taskId").value;
+
+    const res = await fetch(`/status/${id}`);
+    const data = await res.json();
+
+    document.getElementById("statusResult").innerText =
+        JSON.stringify(data, null, 2);
+}
+
+async function approve() {
+    const id = document.getElementById("approveId").value;
+
+    const res = await fetch(`/approve/${id}`, {
+        method: "POST"
+    });
+
+    const data = await res.json();
+
+    document.getElementById("approveResult").innerText =
+        JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>
