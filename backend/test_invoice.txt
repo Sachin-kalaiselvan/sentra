@@ -1,0 +1,20 @@
+INVOICE #INV-2024-0891
+Date: 2024-01-15
+Due Date: 2024-01-01  <-- OVERDUE
+
+Vendor: Acme Supplies Ltd
+Client: TechCorp India Pvt Ltd
+Client PO#: [MISSING]
+
+Line items:
+- Cloud Infrastructure Q4    ₹1,85,000
+- Support Contract renewal   ₹42,000
+- Setup fee (duplicate?)     ₹42,000
+
+Subtotal: ₹2,69,000
+Tax (18% GST): ₹48,420
+TOTAL DUE: ₹3,17,420
+
+Payment terms: Net 30
+Bank: HDFC Account 5588****
+Notes: Second reminder. First sent 2024-01-05. No response received.

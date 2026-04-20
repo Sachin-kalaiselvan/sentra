@@ -61,3 +61,29 @@ def dashboard():
 def memory_search(q: str):
     from app.services.memory_service import search_similar
     return search_similar(q)
+
+@router.get("/runs")
+def list_runs():
+    """Returns all task IDs stored in Celery result backend."""
+    from app.tasks.celery_app import celery_app
+    inspector = celery_app.control.inspect()
+    active = inspector.active() or {}
+    reserved = inspector.reserved() or {}
+    return {
+        "active": active,
+        "reserved": reserved,
+    }
+
+@router.get("/audit/{task_id}")
+def audit(task_id: str):
+    """Full audit trail for a single run."""
+    from celery.result import AsyncResult
+    from app.tasks.celery_app import celery_app
+    result = AsyncResult(task_id, app=celery_app)
+    return {
+        "task_id": task_id,
+        "state": result.state,
+        "result": result.result if result.state == "SUCCESS" else None,
+        "traceback": result.traceback if result.state == "FAILURE" else None,
+        "date_done": str(result.date_done) if result.date_done else None,
+    }
