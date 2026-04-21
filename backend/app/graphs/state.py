@@ -11,3 +11,4 @@ class SentraState(TypedDict):
     risk_level: str
     requires_approval: bool
     llm_result: Dict
+    errors: List[str]
