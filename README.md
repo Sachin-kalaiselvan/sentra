@@ -1,75 +1,55 @@
-# Sentra — Multi-Agent Enterprise Automation
+# sentra
 
-Upload any business document — PDF, CSV, DOCX, email, spreadsheet, image — and four AI agents collaborate to extract, reason, act, and remember.
-
-## Architecture
+drop in any business doc (pdf, csv, docx, email, spreadsheet, image) and four agents tag-team it: pull the content out, figure out what's going on, do something about it, remember it for next time.
 
 ```
-Upload → Extract Agent → Reason Agent → Act Agent → Memory Agent
-           (parse file)    (Groq LLM)   (Jira/Email/Slack)  (Qdrant)
+upload → extract → reason → act → memory
+         (parse)   (groq)   (jira/email/slack)  (qdrant)
 ```
 
-| Agent | What it does |
-|---|---|
-| Extract | Parses PDF, CSV, DOCX, XLSX, TXT, images via OCR |
-| Reason | Sends content to Groq LLM, classifies document, detects anomalies, decides actions |
-| Act | Creates Jira tickets, sends emails, posts Slack messages |
-| Memory | Embeds decisions into Qdrant for semantic retrieval across runs |
+- **extract** - pdf, csv, docx, xlsx, txt, images via OCR
+- **reason** - groq LLM classifies the doc, spots anomalies, decides actions
+- **act** - jira tickets, emails, slack posts
+- **memory** - embeds each decision in qdrant so later runs can search it
 
-## Stack
+## stack
 
-| Layer | Tech |
-|---|---|
-| API | FastAPI + uvicorn |
-| Agent orchestration | LangGraph (conditional routing) |
-| Task queue | Celery + Redis |
-| Vector memory | Qdrant + sentence-transformers (all-MiniLM-L6-v2) |
-| Document parsing | pdfplumber, python-docx, pandas, pytesseract |
-| AI | Groq — llama-3.3-70b-versatile |
-| Integrations | Jira REST API, SMTP, Slack Web API |
-| Observability | Prometheus metrics, Flower (Celery monitor) |
-| CI/CD | GitHub Actions |
+fastapi + uvicorn, langgraph for routing between agents, celery + redis for the queue, qdrant + sentence-transformers (all-MiniLM-L6-v2) for memory, pdfplumber / python-docx / pandas / pytesseract for parsing, groq `llama-3.3-70b-versatile`, jira REST + SMTP + slack web API, prometheus + flower for watching it, github actions for CI.
 
-## Setup
+## run it
 
 ```bash
 git clone https://github.com/Sachin-kalaiselvan/sentra.git
 cd sentra/backend
-cp .env.example .env
-# Edit .env — add GROQ_API_KEY from console.groq.com
+cp .env.example .env      # put your GROQ_API_KEY in (console.groq.com)
 docker compose up --build
 ```
 
-| Service | URL |
-|---|---|
-| Dashboard | http://localhost:8000 |
-| API docs | http://localhost:8000/docs |
-| Flower | http://localhost:5555 |
-| Prometheus | http://localhost:9090 |
+- dashboard http://localhost:8000
+- api docs http://localhost:8000/docs
+- flower http://localhost:5555
+- prometheus http://localhost:9090
 
-Stop cleanly:
-```bash
-docker compose down --timeout 5
-```
+stop: `docker compose down --timeout 5`
 
-## API
+## api
 
-| Method | Path | Description |
+| method | path | what |
 |---|---|---|
-| GET | `/` | Dashboard UI |
-| GET | `/health` | Health check |
-| POST | `/upload` | Upload document and start pipeline |
-| GET | `/status/{task_id}` | Poll pipeline status |
-| POST | `/approve/{task_id}` | Approve and execute high-risk actions |
-| GET | `/pending/{task_id}` | Get pending approval details |
-| GET | `/memory/search?q=...` | Semantic search over past decisions |
-| GET | `/audit/{task_id}` | Full Celery audit trail for a run |
-| GET | `/runs` | Active and reserved tasks |
-| GET | `/metrics` | Prometheus metrics |
+| GET | `/` | dashboard |
+| GET | `/health` | health |
+| POST | `/upload` | upload a doc, kicks off the pipeline |
+| GET | `/status/{task_id}` | poll status |
+| POST | `/approve/{task_id}` | approve + run high-risk actions |
+| GET | `/pending/{task_id}` | what's waiting on approval |
+| GET | `/memory/search?q=...` | semantic search over past decisions |
+| GET | `/audit/{task_id}` | full celery audit trail |
+| GET | `/runs` | active + reserved tasks |
+| GET | `/metrics` | prometheus |
 
-## Demo run
+## example run
 
-**Input — `test_invoice.txt`:**
+in, `test_invoice.txt`:
 ```
 INVOICE #INV-2024-0891
 Date: 2024-01-15 / Due: 2024-01-01  <-- OVERDUE
@@ -86,7 +66,7 @@ TOTAL DUE: ₹3,17,420 (18% GST)
 Notes: Second reminder. No response received.
 ```
 
-**Pipeline output (with Groq API key):**
+out (with a groq key):
 ```json
 {
   "document_type": "invoice",
@@ -104,17 +84,11 @@ Notes: Second reminder. No response received.
 }
 ```
 
-**Agent trace:**
-- Extract: parsed 464 chars from txt file
-- Reason: classified invoice, risk high, 3 anomalies found
-- Act: queued Jira + Slack for approval (high risk requires sign-off)
-- Memory: embedded decision into Qdrant
+trace: extract parsed 464 chars → reason said invoice, high risk, 3 anomalies → act queued jira + slack for sign-off (high risk needs approval) → memory stored it. search `"overdue invoice missing PO"` afterwards and this doc comes back at ~87% similarity.
 
-**Memory search** — after this run, searching `"overdue invoice missing PO"` returns this document with ~87% similarity score.
+## heads up
 
-## Notes
-
-- `.env` is excluded from git (contains secrets) — create from `.env.example` on each machine
-- The sentence-transformer model downloads on first run (~90 MB, cached in container)
-- Qdrant data persists across restarts via Docker volume
-- Integrations are optional — unconfigured ones return `{"success": false, "error": "not configured"}` without crashing the pipeline
+- `.env` isn't in git (secrets), make it from `.env.example` on each machine
+- the sentence-transformer model downloads on first run, ~90 MB, cached in the container
+- qdrant data survives restarts via a docker volume
+- integrations are optional, anything not set up returns `{"success": false, "error": "not configured"}` and the pipeline keeps going
